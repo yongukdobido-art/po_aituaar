@@ -70,6 +70,8 @@ def send(text: str) -> None:
         json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"},
         timeout=20,
     )
+    if not r.ok:
+        print("Telegram ответил:", r.text)
     r.raise_for_status()
 
 
