@@ -29,8 +29,8 @@ WEEKDAYS = ["понедельник", "вторник", "среда", "четв�
             "пятница", "суббота", "воскресенье"]
 
 
-def fetch() -> dict:
-    r = requests.get(API_URL, params={"data": GROUP}, timeout=20,
+def fetch(day: str) -> dict:
+    r = requests.get(API_URL, params={"data": GROUP, "date": day}, timeout=20,
                      headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
     return r.json()
@@ -77,7 +77,7 @@ def send(text: str) -> None:
 
 def main() -> None:
     tomorrow = (datetime.now(TZ) + timedelta(days=1)).strftime("%Y-%m-%d")
-    send(build_message(fetch(), tomorrow))
+    send(build_message(fetch(tomorrow), tomorrow))
 
 
 if __name__ == "__main__":
