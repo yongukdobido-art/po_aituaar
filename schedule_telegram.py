@@ -91,12 +91,22 @@ def send(text: str) -> None:
 def main() -> None:
     tomorrow_dt = datetime.now(TZ) + timedelta(days=1)
     tomorrow = tomorrow_dt.strftime("%Y-%m-%d")
+    day_name = WEEKDAYS[tomorrow_dt.weekday()]
+    date_str = tomorrow_dt.strftime("%d.%m.%Y")
+    is_weekend = tomorrow_dt.weekday() >= 5  # 5 = суббота, 6 = воскресенье
+
     data = fetch(tomorrow)
-    if data is None:
-        day_name = WEEKDAYS[tomorrow_dt.weekday()]
-        send(f"⏳ Расписание на {tomorrow_dt.strftime('%d.%m.%Y')} ({day_name}) "
-             f"пока не опубликовано.")
+
+    # Завтра выходной и пар на сайте нет
+    if is_weekend and (data is None or not data.get("lessons")):
+        send(f"🏖 Завтра {date_str} ({day_name}) выходной, пар нет.")
         return
+
+    # Будний день, но расписание ещё не выложили
+    if data is None:
+        send(f"⏳ Расписание на {date_str} ({day_name}) пока не опубликовано.")
+        return
+
     send(build_message(data, tomorrow, fetch_times(data["date"])))
 
 
