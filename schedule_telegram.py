@@ -22,9 +22,6 @@ TOKEN = os.environ["TG_TOKEN"]
 CHAT_ID = os.environ["TG_CHAT_ID"]
 TZ = ZoneInfo("Asia/Almaty")
 
-# Время звонков (по желанию), например: {1: "08:30–10:00"}
-BELLS: dict[int, str] = {}
-
 WEEKDAYS = ["понедельник", "вторник", "среда", "четверг",
             "пятница", "суббота", "воскресенье"]
 
@@ -36,7 +33,20 @@ def fetch(day: str) -> dict:
     return r.json()
 
 
-def build_message(data: dict, tomorrow: str) -> str:
+def fetch_times(day: str) -> dict[int, str]:
+    """Время пар на дату: {номер: '12:55–14:25'}. При ошибке вернёт пустой словарь."""
+    try:
+        r = requests.get("https://timetable.pbk.kz/api/lesson-times",
+                         params={"date": day}, timeout=20,
+                         headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        return {t["number"]: f"{t['startsAt']}–{t['endsAt']}"
+                for t in r.json().get("times", [])}
+    except (requests.RequestException, KeyError, ValueError):
+        return {}
+
+
+def build_message(data: dict, tomorrow: str, times: dict[int, str]) -> str:
     esc = html.escape
     day = datetime.strptime(data["date"], "%Y-%m-%d")
     lines = []
@@ -52,7 +62,7 @@ def build_message(data: dict, tomorrow: str) -> str:
     if not lessons:
         lines.append("Пар нет 🎉")
     for les in lessons:
-        time = BELLS.get(les["number"])
+        time = times.get(les["number"])
         head = f"<b>{les['number']} пара</b>" + (f" ({time})" if time else "")
         if les.get("changed"):
             head += " ❗ЗАМЕНА"
@@ -77,7 +87,8 @@ def send(text: str) -> None:
 
 def main() -> None:
     tomorrow = (datetime.now(TZ) + timedelta(days=1)).strftime("%Y-%m-%d")
-    send(build_message(fetch(tomorrow), tomorrow))
+    data = fetch(tomorrow)
+    send(build_message(data, tomorrow, fetch_times(data["date"])))
 
 
 if __name__ == "__main__":
