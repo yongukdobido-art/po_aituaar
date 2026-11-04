@@ -26,9 +26,12 @@ WEEKDAYS = ["понедельник", "вторник", "среда", "четв�
             "пятница", "суббота", "воскресенье"]
 
 
-def fetch(day: str) -> dict:
+def fetch(day: str) -> dict | None:
+    """Расписание на дату. Если сайт ответил 404 (не опубликовано) -> None."""
     r = requests.get(API_URL, params={"data": GROUP, "date": day}, timeout=20,
                      headers={"User-Agent": "Mozilla/5.0"})
+    if r.status_code == 404:
+        return None
     r.raise_for_status()
     return r.json()
 
@@ -86,8 +89,14 @@ def send(text: str) -> None:
 
 
 def main() -> None:
-    tomorrow = (datetime.now(TZ) + timedelta(days=1)).strftime("%Y-%m-%d")
+    tomorrow_dt = datetime.now(TZ) + timedelta(days=1)
+    tomorrow = tomorrow_dt.strftime("%Y-%m-%d")
     data = fetch(tomorrow)
+    if data is None:
+        day_name = WEEKDAYS[tomorrow_dt.weekday()]
+        send(f"⏳ Расписание на {tomorrow_dt.strftime('%d.%m.%Y')} ({day_name}) "
+             f"пока не опубликовано.")
+        return
     send(build_message(data, tomorrow, fetch_times(data["date"])))
 
 
