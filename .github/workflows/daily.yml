@@ -2,9 +2,18 @@ name: Daily schedule
 
 on:
   schedule:
-    # 15:00 UTC = 20:00 по Казахстану (UTC+5). Поменяйте час при необходимости.
+    # 12:07 UTC = 17:07 по Казахстану — основная отправка (как и раньше)
     - cron: "7 12 * * *"
-  workflow_dispatch:   # кнопка ручного запуска
+    # 14:07 и 16:07 UTC = 19:07 и 21:07 КЗ в пт/сб/вс — перепроверка понедельника
+    - cron: "7 14,16 * * 5,6,0"
+  workflow_dispatch:   # ручной запуск (отправляет принудительно, без проверки на дубли)
+
+permissions:
+  contents: write      # нужно, чтобы сохранять state.json (память «что уже отправлено»)
+
+concurrency:
+  group: schedule-state
+  cancel-in-progress: false
 
 jobs:
   send:
@@ -15,7 +24,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests
-      - run: python schedule_telegram.py
+      - run: python schedule_telegram.py ${{ github.event.schedule == '7 14,16 * * 5,6,0' && 'recheck' || 'notify' }}
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Save state
+        run: |
+          git config user.name "schedule-bot"
+          git config user.email "schedule-bot@users.noreply.github.com"
+          git add state.json || true
+          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase && git push)
