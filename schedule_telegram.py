@@ -77,27 +77,27 @@ def build_message(data: dict, tomorrow: str, times: dict[int, str],
     lines = []
 
     if updated:
-        lines.append("🔄 <b>Расписание обновлено</b>\n")
+        lines.append(" <b>Расписание обновлено</b>\n")
 
     if data["date"] != tomorrow:
-        lines.append(f"⚠️ Расписание на {tomorrow} ещё не опубликовано. "
+        lines.append(f" Расписание на {tomorrow} ещё не опубликовано. "
                      f"На сайте сейчас данные на {data['date']}.\n")
 
-    lines.append(f"📅 <b>{day.strftime('%d.%m.%Y')}, {WEEKDAYS[day.weekday()]}</b>")
+    lines.append(f" <b>{day.strftime('%d.%m.%Y')}, {WEEKDAYS[day.weekday()]}</b>")
     lines.append(f"Группа {esc(data['group'])} · неделя: {esc(data.get('variant', '—'))}\n")
 
     lessons = sorted(data.get("lessons", []), key=lambda x: x["number"])
     if not lessons:
-        lines.append("Пар нет 🎉")
+        lines.append("Пар нет ")
     for les in lessons:
         time_ = times.get(les["number"])
         head = f"<b>{les['number']} пара</b>" + (f" ({time_})" if time_ else "")
         if les.get("changed"):
             head += " ❗ЗАМЕНА"
         lines.append(head)
-        lines.append(f"📚 {esc(les['subject'])}")
-        lines.append(f"👤 {esc(les['teacher'])}")
-        lines.append(f"🚪 {esc(les['room'])}\n")
+        lines.append(f" {esc(les['subject'])}")
+        lines.append(f" {esc(les['teacher'])}")
+        lines.append(f" {esc(les['room'])}\n")
 
     return "\n".join(lines)
 
@@ -113,8 +113,8 @@ def tg(method: str, timeout: int = 20, **payload) -> dict:
     return r.json()
 
 
-BTN_BELLS = "🔔 Расписание звонков"
-BTN_TOMORROW = "📅 Расписание на завтра"
+BTN_BELLS = " Расписание звонков"
+BTN_TOMORROW = " Расписание на завтра"
 
 
 def reply_keyboard() -> dict:
@@ -127,8 +127,8 @@ def inline_keyboard() -> dict:
     """Выбор дня. Значения разрешаются в момент нажатия,
     поэтому работают в любой день, включая субботу и воскресенье."""
     return {"inline_keyboard": [
-        [{"text": "📅 Сегодня", "callback_data": "today"},
-         {"text": "📅 Завтра", "callback_data": "tomorrow"}],
+        [{"text": " Сегодня", "callback_data": "today"},
+         {"text": " Завтра", "callback_data": "tomorrow"}],
         [{"text": n, "callback_data": f"wd:{i}"} for i, n in enumerate(SHORT)],
     ]}
 
@@ -207,10 +207,10 @@ def notify(now: datetime | None = None, force: bool = False) -> None:
     # Расписание ещё не выложили (в пятницу — строго на понедельник)
     if data is None or (friday and not published):
         if friday:
-            send(f"⏳ Расписание на {date_str} ({day_name}) пока не опубликовано. "
+            send(f" Расписание на {date_str} ({day_name}) пока не опубликовано. "
                  f"Проверю ещё раз вечером и в выходные.")
         else:
-            send(f"⏳ Расписание на {date_str} ({day_name}) пока не опубликовано.")
+            send(f" Расписание на {date_str} ({day_name}) пока не опубликовано.")
         return
 
     if published:
@@ -255,9 +255,9 @@ def schedule_text(dt: datetime) -> str:
     published = data is not None and data.get("date") == day
     has_lessons = published and bool(data.get("lessons"))
     if dt.weekday() >= 5 and not has_lessons:
-        return f"🏖 {date_str} ({name}) — выходной, пар нет."
+        return f" {date_str} ({name}) — выходной, пар нет."
     if not published:
-        return f"⏳ Расписание на {date_str} ({name}) пока не опубликовано."
+        return f" Расписание на {date_str} ({name}) пока не опубликовано."
     return build_message(data, day, fetch_times(day))
 
 
@@ -307,9 +307,9 @@ def bells_text(now: datetime) -> str:
         dt += timedelta(days=1)
     times = fetch_times(dt.strftime("%Y-%m-%d"))
     if not times:
-        return "🔔 Не удалось получить расписание звонков, попробуйте позже."
+        return " Не удалось получить расписание звонков, попробуйте позже."
     rows = "\n".join(f"<b>{n} пара</b> — {t}" for n, t in sorted(times.items()))
-    return f"🔔 <b>Расписание звонков</b>\n\n{rows}"
+    return f" <b>Расписание звонков</b>\n\n{rows}"
 
 
 def poll(duration: int = 0) -> None:
