@@ -35,6 +35,9 @@ API_URL = "https://timetable.pbk.kz/api/schedule"
 GROUP = os.environ.get("GROUP", "ПО-265")
 TOKEN = os.environ["TG_TOKEN"]
 CHAT_ID = os.environ["TG_CHAT_ID"]
+# Можно несколько получателей через запятую: "111111,222222"
+CHAT_IDS = [c.strip() for c in CHAT_ID.split(",") if c.strip()]
+REPLY_TO = None  # при ответе на кнопку шлём только тому, кто нажал
 TZ = ZoneInfo("Asia/Almaty")
 STATE_FILE = Path(__file__).with_name("state.json")
 FORCE = os.environ.get("FORCE", "").lower() == "true"
@@ -134,14 +137,18 @@ def inline_keyboard() -> dict:
 
 
 def send(text: str, markup: bool = True, inline: bool = False) -> None:
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
+    payload = {"text": text, "parse_mode": "HTML"}
     # Клавиатуру прикрепляем только если включено KEYBOARD=true (режим poll),
     # чтобы не трогать кнопки, настроенные вами в другом месте.
     if inline:
         payload["reply_markup"] = inline_keyboard()
     elif markup and os.environ.get("KEYBOARD", "").lower() == "true":
         payload["reply_markup"] = reply_keyboard()
-    tg("sendMessage", **payload)
+    for chat in ([REPLY_TO] if REPLY_TO else CHAT_IDS):
+        try:  # недоступный получатель не должен ломать отправку остальным
+            tg("sendMessage", chat_id=chat, **payload)
+        except requests.RequestException as e:
+            print(f"Не удалось отправить {chat}:", repr(e))
 
 
 # ───────────────────────── состояние (антидубли) ─────────────────────────
@@ -262,21 +269,24 @@ def schedule_text(dt: datetime) -> str:
 
 
 def handle_update(u: dict) -> None:
+    global REPLY_TO
     now = datetime.now(TZ)
     cb = u.get("callback_query")
     if cb:
         chat = (cb.get("message") or {}).get("chat", {}).get("id", cb["from"]["id"])
         tg("answerCallbackQuery", callback_query_id=cb["id"])
-        if str(chat) != str(CHAT_ID):
+        if str(chat) not in CHAT_IDS:
             return
+        REPLY_TO = str(chat)
         dt = resolve(cb.get("data", ""), now)
         if dt:
             send(schedule_text(dt))
         return
 
     msg = u.get("message")
-    if not msg or str(msg["chat"]["id"]) != str(CHAT_ID):
+    if not msg or str(msg["chat"]["id"]) not in CHAT_IDS:
         return
+    REPLY_TO = str(msg["chat"]["id"])
     text = (msg.get("text") or "").strip().lower()
     cmd = text.split()[0].split("@")[0] if text else ""
     if "звонков" in text or cmd == "/bells":
@@ -313,6 +323,7 @@ def bells_text(now: datetime) -> str:
 
 
 def poll(duration: int = 0) -> None:
+    global REPLY_TO
     """duration=0 — один проход; иначе long-polling указанное число секунд."""
     offset = None
     deadline = time.time() + duration
@@ -328,6 +339,8 @@ def poll(duration: int = 0) -> None:
                 handle_update(u)
             except Exception as e:  # одна ошибка не должна ронять остальные
                 print("Ошибка обработки:", repr(e))
+            finally:
+                REPLY_TO = None
         if time.time() >= deadline:
             break
     if offset:  # подтверждаем обработанные обновления
